@@ -2,120 +2,213 @@ import express from "express";
 
 const app = express();
 
-let alunos = [
+let dateDummy = new Date
+
+const alunos = [
   { nome: "Dummy", 
     matricula: "A123", 
     status: "ativo", 
-    notas: [7, 7, 7, 7] 
+    notas: [7, 7, 7, 7],
+    dataCriacao: dateDummy.toISOString() 
   },
   {
     nome: "Admin",
     matricula: "Z987",
-    status: "inativo",
-    notas: [10, 10, 10, 10],
+    status: "ativo",
+    notas: [10,10,10,10],
+    dataCriacao: dateDummy.toISOString() 
   },
 ];
 
 app.use(express.json());
 
 app.post("/alunos", (req, res) => {
-  const { nome, matricula, status } = req.body;
-  if (nome && matricula) {
-    if (status === "ativo" || status == "inativo") {
-      let buscaMatricula = alunos.find((aluno) => aluno.matricula == matricula);
-      if (!buscaMatricula) {
-        alunos.push({
-          nome,
-          matricula,
-          status,
-        });
-        res.json({
-          mensagem: "Aluno cadastrado com sucesso!",
-          body: { nome, matricula, status },
-        });
-      } else {
-        res.json({
-          mensagem: "Matricula já cadastrada!",
-        });
-      }
-    } else {
-      res.json({
-        mensagem:
-          'Campo "status" deve ser preenchido como "ativo" ou "inativo"',
+  let { nome, matricula, status } = req.body;
+  matricula = matricula.toUpperCase()
+
+  if (!nome) {
+    res.status(400).json({
+      erro: "O campo 'nome' é obrigatório."
+    })
+  }
+  
+  if (!matricula) {
+    res.status(400).json({
+      erro: "O campo 'matricula' é obrigatório."
+    })
+  }
+  
+  if (!status) {
+    res.status(400).json({
+      erro: "O campo 'status' é obrigatório."
+    })
+  }
+
+  if (nome.length < 3) {
+    res.status(400).json({
+      erro: "O nome deve conter pelo menos 3 caracteres."
+    })
+  }
+
+  if (status === "ativo" || status == "inativo") {
+    let buscaMatricula = alunos.find((aluno) => aluno.matricula == matricula);
+    if (!buscaMatricula) {
+      let date = new Date
+      alunos.push({
+        nome,
+        matricula,
+        status,
+        dataCriacao: date.toISOString(),
       });
+      res.status(201).json({
+        mensagem: "Aluno cadastrado com sucesso."
+      });
+    } else {
+      res.status(409).json({ 
+        erro: "Já existe um aluno com essa matrícula."
+        });
     }
   } else {
-    res.json({
-      mensagem: "Matrícula ou nome não preenchidos",
+    res.status(400).json({
+      erro:
+        "O campo 'status' deve ser 'ativo' ou 'inativo'.",
     });
   }
 });
 
 app.post("/alunos/:matricula/notas", (req, res) => {
-  const params = req.params.matricula;
-
+  const params = req.params.matricula.toUpperCase();
   const { notas } = req.body;
+
+  if (!notas) {
+    res.status(400).json({
+      erro: "O campo 'notas' é obrigatório e deve ser um array de 4 números.",
+    })
+  }
+
+  for (let i = 0; i < notas.length; i++){
+    if(notas[i] > 10 || notas[i] < 0){
+      res.status(400).json({
+        erro: "As notas devem estar entre 0 e 10."
+      })
+    }
+  }
+
   if (notas.length == 4) {
     const alunoBuscaMatricula = alunos.find(
       (aluno) => aluno.matricula == params
     );
     if (alunoBuscaMatricula) {
+      if (alunoBuscaMatricula.status == "inativo") {
+        res.status(403).json({
+          erro: "Não é possível cadastrar notas para alunos inativos.",
+        })
+      }
+      let date = new Date
       alunoBuscaMatricula.notas = notas;
+      alunoBuscaMatricula.dataAlteracao = date.toISOString()
       res.json({
-        mensagem: "Notas cadastradas!",
-        body: { ...alunoBuscaMatricula, notas },
+        mensagem: "Notas cadastradas com sucesso.",
       });
     } else {
-      res.json({
-        mensagem: "Matrícula não cadastrada!",
+      res.status(404).json({
+        erro: "Aluno não encontrado.",
       });
     }
   } else {
-    res.json({
-      mensagem: "Inclua quatro notas!",
+    res.status(400).json({
+      erro: "Devem ser fornecidas exatamente 4 notas.",
     });
   }
 });
 
 app.delete("/alunos/:matricula", (req, res) => {
-  const { matricula } = req.params;
+  let { matricula } = req.params;
+  matricula = matricula.toUpperCase()
+  
   const aluno = alunos.find((aluno) => aluno.matricula == matricula);
   if (aluno) {
-    alunos = alunos.filter((aluno) => aluno.matricula != matricula);
-    res.json({
-      mensagem: "Aluno deletado com sucesso!",
+    let date = new Date
+    aluno.status = "inativo"
+    aluno.dataDeletado = date.toISOString()
+    res.status(200).json({
+      mensagem: "Aluno removido com sucesso.",
     });
   } else {
-    res.json({
-      mensagem: "Matrícula inexistente!",
+    res.status(404).json({
+      erro: "Aluno não encontrado.",
     });
   }
 });
 
 app.get("/alunos", (req, res) => {
+  const param = req.query.status 
+
+  if (param == 'ativo') {
   const alunosAtivos = alunos.filter((aluno) => aluno.status == "ativo");
   const listaAlunos = alunosAtivos.map((aluno) => {
     return {
       nome: aluno.nome,
       matricula: aluno.matricula,
+      dataCriacao: aluno.dataCriacao,
     };
   });
-  res.json(listaAlunos);
+  res.status(200).json(listaAlunos);
+  }
+
+  if (param == 'inativo') {
+    const alunosInativos = alunos.filter((aluno) => aluno.status == "inativo");
+    const listaAlunos = alunosInativos.map((aluno) => {
+      return {
+        nome: aluno.nome,
+        matricula: aluno.matricula,
+        dataCriacao: aluno.dataCriacao,
+      };
+    });
+    res.status(200).json(listaAlunos);
+    }
+
+  if (!param){
+    const listaAlunos = alunos.map( aluno => {
+      return {
+        nome: aluno.nome,
+        matricula: aluno.matricula,
+        status: aluno.status,
+        dataCriacao: aluno.dataCriacao,
+      }
+    })
+    res.status(200).json(listaAlunos)
+  }
 });
 
 app.get("/alunos/notas", (req, res) => {
-  const alunosComNotas = alunos.filter((aluno) => aluno.notas);
-  const listaAlunos = alunosComNotas.map((aluno) => {
+  const alunosComNotasAtivos = alunos.filter((aluno) => aluno.notas && aluno.status == "ativo");
+  const listaAlunos = alunosComNotasAtivos.map((aluno) => {
     if (aluno.notas) {
       const media =
         aluno.notas[0] / 4 +
         aluno.notas[1] / 4 +
         aluno.notas[2] / 4 +
         aluno.notas[3] / 4;
+
+      if(media >= 7 ) {
+        aluno.situacao = "aprovado"
+      }
+
+      if(media >= 5 && media < 7) {
+        aluno.situacao = "recuperação"
+      }
+
+      if(media < 5) {
+        aluno.situacao = "reprovado"
+      }
+      
       return {
         nome: aluno.nome,
+        matricula: aluno.matricula,
         notas: aluno.notas,
         media,
+        situacao: aluno.situacao,
       };
     }
   });
@@ -123,23 +216,39 @@ app.get("/alunos/notas", (req, res) => {
 });
 
 app.get("/alunos/:matricula", (req, res) => {
-  const params = req.params.matricula;
+  const params = req.params.matricula.toUpperCase();
   const aluno = alunos.find((aluno) => aluno.matricula == params);
-  aluno.media = "N/A";
+
+  if (!aluno) {
+    res.status(404).json({
+      erro: "Aluno não encontrado.",
+    })
+  }
   if (aluno.notas) {
     const media =
       aluno.notas[0] / 4 +
       aluno.notas[1] / 4 +
       aluno.notas[2] / 4 +
       aluno.notas[3] / 4;
+
+    if(media >= 7 ) {
+      aluno.situacao = "aprovado"
+    }
+
+    if(media >= 5 && media < 7) {
+      aluno.situacao = "recuperação"
+    }
+
+    if(media < 5) {
+      aluno.situacao = "reprovado"
+    }
+
     aluno.media = media;
   }
-  res.json({
-    nome: aluno.nome,
-    matricula: aluno.matricula,
-    status: aluno.status,
-    media: aluno.media,
-  });
+
+  res.status(200).json(aluno);
+
+  delete aluno.media
 });
 
 app.listen(3000, () => {
