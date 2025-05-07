@@ -185,6 +185,7 @@ app.get("/alunos/notas", (req, res) => {
   const alunosComNotasAtivos = alunos.filter((aluno) => aluno.notas && aluno.status == "ativo");
   const listaAlunos = alunosComNotasAtivos.map((aluno) => {
     if (aluno.notas) {
+      let situacao
       const media =
         aluno.notas[0] / 4 +
         aluno.notas[1] / 4 +
@@ -192,15 +193,15 @@ app.get("/alunos/notas", (req, res) => {
         aluno.notas[3] / 4;
 
       if(media >= 7 ) {
-        aluno.situacao = "aprovado"
+        situacao = "aprovado"
       }
 
       if(media >= 5 && media < 7) {
-        aluno.situacao = "recuperação"
+        situacao = "recuperação"
       }
 
       if(media < 5) {
-        aluno.situacao = "reprovado"
+        situacao = "reprovado"
       }
       
       return {
@@ -208,7 +209,7 @@ app.get("/alunos/notas", (req, res) => {
         matricula: aluno.matricula,
         notas: aluno.notas,
         media,
-        situacao: aluno.situacao,
+        situacao,
       };
     }
   });
@@ -225,6 +226,7 @@ app.get("/alunos/:matricula", (req, res) => {
     })
   }
   if (aluno.notas) {
+    let situacao
     const media =
       aluno.notas[0] / 4 +
       aluno.notas[1] / 4 +
@@ -232,26 +234,22 @@ app.get("/alunos/:matricula", (req, res) => {
       aluno.notas[3] / 4;
 
     if(media >= 7 ) {
-      aluno.situacao = "aprovado"
+      situacao = "aprovado"
     }
 
     if(media >= 5 && media < 7) {
-      aluno.situacao = "recuperação"
+      situacao = "recuperação"
     }
 
     if(media < 5) {
-      aluno.situacao = "reprovado"
+      situacao = "reprovado"
     }
 
-    aluno.media = media;
+    return res.status(200).json({...aluno, media, situacao});
   }
-  const media = aluno.media
-  if (media) {
-    delete aluno.media
-    return res.status(200).json({...aluno, media});
-  }else{
-    return res.status(200).json(aluno)
-  }
+  
+  return res.status(200).json(aluno)
+  
 });
 
 app.listen(3000, () => {
